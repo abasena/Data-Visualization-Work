@@ -1,0 +1,62 @@
+version: '3.9'
+services:
+  d-zookeeper:
+    image: debezium/zookeeper:2.2
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+      - "2888:2888"
+      - "3888:3888"
+  d-kafka:
+    image: debezium/kafka:2.2
+    container_name: d-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      - ZOOKEEPER_CONNECT=zookeeper:2181
+    depends_on:
+      - d-zookeeper
+  d-mysqldb:
+    image: debezium/example-mysql:2.2
+    container_name: d-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=debezium
+      - MYSQL_USER=mysqluser
+      - MYSQL_PASSWORD=mysqlpw
+  d-kafka-connect:
+    image: debezium/connect:2.2
+    container_name: d-kafka-connect
+    depends_on:
+      - d-kafka
+      - d-mysqldb
+    ports:
+      - "8083:8083"
+    environment:
+      - BOOTSTRAP_SERVERS=d-kafka:9092
+      - GROUP_ID=1
+      - CONFIG_STORAGE_TOPIC=my_connect_configs
+      - OFFSET_STORAGE_TOPIC=my_connect_offsets
+      - STATUS_STORAGE_TOPIC=my_connect_statuses
+  d-telegraf:
+    image: telegraf:latest
+    container_name: d-telegraf
+    ports:
+      - "8125:8125"
+    volumes:
+      - ./telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    depends_on:
+      - d-influxdb
+      - d-kafka
+  d-influxdb:
+    image: influxdb:latest
+    container_name: d-influxdb
+    environment:
+      - INFLUXDB_DB=influx
+      - INFLUXDB_ADMIN_USER=admin
+      - INFLUXDB_ADMIN_PASSWORD=admin
+    ports:
+      - "8086:8086"
+    volumes:
+      - ./influxdata:/var/lib/influxdb
